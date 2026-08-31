@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>공문 발송대장 · BNCP</title>
+<style>
+  :root{
+    --ink:#16202B; --paper:#F6F7F5; --card:#FFF;
+    --rule:#D8DCD7; --hard:#16202B;
+    --stamp:#B3382C; --ok:#3F6B4E; --muted:#6E7770; --wash:#ECEEE9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:15px/1.55 -apple-system,"Segoe UI",Roboto,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .mono{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .wrap{max-width:1120px;margin:0 auto;padding:26px 20px 70px}
+  header{border-bottom:2px solid var(--hard);padding-bottom:13px;margin-bottom:22px;
+    display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}
+  .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  h1{margin:4px 0 0;font-size:24px;letter-spacing:-.01em}
+  .sub{margin-top:4px;font-size:13px;color:var(--muted)}
+  button{font:inherit;font-size:14px;padding:8px 15px;border-radius:3px;cursor:pointer;
+    border:1px solid var(--hard);background:var(--card);color:var(--ink)}
+  button:hover{background:var(--wash)}
+  button.primary{background:var(--stamp);border-color:var(--stamp);color:#fff}
+  button.primary:hover{background:#9C3025}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  :focus-visible{outline:2px solid var(--stamp);outline-offset:2px}
+  .claim{background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--stamp);
+    padding:18px 20px;margin-bottom:20px;display:grid;
+    grid-template-columns:minmax(260px,1fr) auto;gap:18px;align-items:center}
+  .label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .refbig{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:5px;white-space:nowrap}
+  .refbig .seq{color:var(--stamp);font-size:33px;font-weight:700}
+  .note{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .panel{background:var(--card);border:1px solid var(--rule);padding:18px 20px;margin-bottom:20px}
+  .panel h2{margin:0 0 12px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+  input,select{width:100%;font:inherit;font-size:14px;padding:8px 10px;
+    border:1px solid var(--rule);border-radius:3px;background:#fff;color:var(--ink)}
+  .full{grid-column:1/-1}
+  .actions{margin-top:14px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--card)}
+  th{text-align:left;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+    font-weight:600;padding:9px 10px;border-bottom:2px solid var(--hard);white-space:nowrap}
+  td{padding:9px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+  tr:hover td{background:var(--wash)}
+  td.ref{font-weight:600;white-space:nowrap}
+  td.dim{color:var(--muted)}
+  .msg{padding:11px 13px;margin-bottom:16px;font-size:13.5px;border-left:3px solid}
+  .msg.err{background:#FBEDEB;border-color:var(--stamp);color:#7E241B}
+  .msg.ok{background:#EDF3EE;border-color:var(--ok);color:#2C4C37}
+  .msg.info{background:var(--wash);border-color:var(--muted)}
+  .foot{margin-top:24px;font-size:12px;color:var(--muted);line-height:1.7}
+  .foot code{background:var(--wash);padding:1px 5px;border-radius:2px}
+  @media(max-width:640px){.claim{grid-template-columns:1fr}.refbig{font-size:21px}.refbig .seq{font-size:26px}}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Bismayah New City Project</div>
+      <h1>공문 발송대장</h1>
+      <div class="sub">면세신청 공문 번호를 여기서 먼저 받아 가세요. 같은 번호는 두 사람에게 발급되지 않습니다.</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="reload">새로고침</button>
+      <button id="settoken">토큰 설정</button>
+    </div>
+  </header>
+
+  <div id="msg" class="msg info">대장을 불러오는 중입니다.</div>
+
+  <section class="claim">
+    <div>
+      <div class="label">다음 발급 번호</div>
+      <div class="refbig mono" id="nextref">—</div>
+      <div class="note" id="nextnote">발급 월을 선택하세요.</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+      <select id="pj" aria-label="프로젝트">
+        <option value="BNCP">BNCP</option><option value="BNCPSI">BNCPSI</option>
+      </select>
+      <input id="ym" type="month" style="width:auto" aria-label="발급 월">
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>새 공문 등록</h2>
+    <div class="grid">
+      <div><label for="f_bl">B/L 번호</label><input id="f_bl" class="mono" placeholder="SEL1672495"></div>
+      <div><label for="f_vessel">선박명</label><input id="f_vessel" placeholder="CMA CGM ANDROMEDA"></div>
+      <div><label for="f_writer">담당자</label><input id="f_writer" placeholder="HH"></div>
+      <div><label for="f_date">발급일</label><input id="f_date" type="date"></div>
+      <div class="full"><label for="f_cargo">품목 (영문)</label><input id="f_cargo" placeholder="CONSTRUCTION MATERIAL"></div>
+      <div class="full"><label for="f_re">공문 제목 (Re)</label><input id="f_re" placeholder="품목을 입력하면 자동으로 채워집니다"></div>
+      <div class="full"><label for="f_to">수신처 (To)</label><input id="f_to"></div>
+      <div class="full"><label for="f_attn">참조 (Attention)</label><input id="f_attn"></div>
+      <div class="full"><label for="f_note">비고</label><input id="f_note" placeholder="선택 입력"></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="add">이 번호로 등록</button>
+      <span class="note" id="addhint"></span>
+    </div>
+  </section>
+
+  <table>
+    <thead><tr><th>공문번호</th><th>발급일</th><th>PJ</th><th>공문 제목</th><th>수신처</th><th>B/L</th><th>품목</th><th>담당</th></tr></thead>
+    <tbody id="tbody"><tr><td colspan="8" class="dim" style="padding:20px">—</td></tr></tbody>
+  </table>
+
+  <div class="foot">
+    <b>중복이 나지 않는 이유</b> — 등록할 때 대장을 읽은 시점을 함께 보냅니다.
+    그 사이 다른 사람이 먼저 등록했으면 저장이 거부되고, 화면이 최신 번호로 다시 계산됩니다.
+    엑셀 공동편집과 달리 같은 번호가 두 번 나갈 수 없습니다.<br>
+    <b>토큰</b> — 저장에는 GitHub 토큰이 필요합니다(<code>repo</code> 권한).
+    이 브라우저에만 저장되며 페이지에는 들어 있지 않습니다.
+  </div>
+</div>
+
+<script>
+const CFG={owner:'hhkas',repo:'Mata',path:'dispatch_log.csv',branch:'main'};
+const COLS=['ref','date','pj','re','to','attn','bl','vessel','cargo','writer','note'];
+// ALE 공문 템플릿과 동일한 기본 수신처. 바뀌면 여기만 고치면 된다.
+const DEF = {
+  to:'National Investment Commission of Iraq',
+  attn:'H.E. Dr. Haider Mohammed Makiya, Chairman of NIC',
+  re:cargo => 'Request for necessary support on Import of ' + (cargo||'')
+};
+const $=s=>document.querySelector(s);
+let ROWS=[],SHA=null,TOKEN='';
+try{TOKEN=localStorage.getItem('mata_token')||''}catch(_){}
+
+const msg=(t,k)=>{const m=$('#msg');m.textContent=t;m.className='msg '+(k||'info')};
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function parseCSV(text){
+  const out=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++} else q=false } else cur+=c }
+    else if(c==='"') q=true;
+    else if(c===','){row.push(cur);cur=''}
+    else if(c==='\n'){row.push(cur);out.push(row);row=[];cur=''}
+    else if(c!=='\r') cur+=c;
+  }
+  if(cur!==''||row.length){row.push(cur);out.push(row)}
+  return out.filter(r=>r.some(v=>String(v).trim()!==''));
+}
+const cell=v=>{v=String(v==null?'':v).replace(/[\r\n]+/g,' ').trim();
+  return /[",]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+const toCSV=rows=>COLS.join(',')+'\n'+rows.map(r=>COLS.map(c=>cell(r[c])).join(',')).join('\n')+'\n';
+
+const b64enc=s=>{const b=new TextEncoder().encode(s);let x='';b.forEach(c=>x+=String.fromCharCode(c));return btoa(x)};
+const b64dec=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g,'')),c=>c.charCodeAt(0)));
+
+const API=`https://api.github.com/repos/${CFG.owner}/${CFG.repo}/contents/${encodeURIComponent(CFG.path)}`;
+const hdr=()=>{const h={'Accept':'application/vnd.github+json'};if(TOKEN)h.Authorization='Bearer '+TOKEN;return h};
+
+async function load(){
+  msg('대장을 불러오는 중입니다.','info');
+  try{
+    const r=await fetch(`${API}?ref=${CFG.branch}&t=${Date.now()}`,{headers:hdr()});
+    if(r.status===404){ROWS=[];SHA=null;
+      msg('대장 파일이 아직 없습니다. 첫 공문을 등록하면 새로 만들어집니다.','info');render();return}
+    if(!r.ok) throw new Error(r.status===401?'토큰이 올바르지 않습니다.'
+      :r.status===403?'접근이 거부됐습니다. 저장소 권한을 확인하세요.'
+      :'대장을 읽지 못했습니다 ('+r.status+')');
+    const j=await r.json();SHA=j.sha;
+    const rows=parseCSV(b64dec(j.content));
+    const head=rows.length?rows[0].map(h=>h.trim().toLowerCase()):COLS;
+    ROWS=rows.slice(1).map(r=>{const o={};COLS.forEach(c=>{const i=head.indexOf(c);o[c]=i>=0?(r[i]||'').trim():''});return o});
+    msg(`대장 ${ROWS.length}건을 읽었습니다.`,'ok');render();
+  }catch(e){msg(e.message||String(e),'err')}
+}
+
+function nextRef(){
+  const pj=$('#pj').value,ym=$('#ym').value;
+  if(!ym) return {ref:'—'};
+  const [y,m]=ym.split('-'), head=`${pj}-MMT-${y}-${m}-`;
+  let last=0;
+  for(const r of ROWS){
+    if(!r.ref||r.ref.indexOf(head)!==0) continue;
+    const n=parseInt(r.ref.slice(head.length),10);
+    if(isFinite(n)&&n>last) last=n;
+  }
+  return {ref:head+String(last+1).padStart(3,'0'),seq:last+1,last};
+}
+
+function render(){
+  const n=nextRef();
+  $('#nextref').innerHTML = n.ref==='—' ? '—'
+    : esc(n.ref.slice(0,-3))+'<span class="seq">'+esc(n.ref.slice(-3))+'</span>';
+  $('#nextnote').textContent = n.ref==='—' ? '발급 월을 선택하세요.'
+    : n.last ? `이번 달 마지막 발급 ${String(n.last).padStart(3,'0')} → 다음 ${String(n.seq).padStart(3,'0')}`
+             : '이번 달 첫 공문입니다.';
+  $('#addhint').textContent = TOKEN?'':'등록하려면 토큰 설정이 필요합니다.';
+  const list=ROWS.slice().sort((a,b)=>String(b.ref).localeCompare(String(a.ref)));
+  $('#tbody').innerHTML = list.length ? list.map(r=>`<tr>
+      <td class="ref mono">${esc(r.ref)}</td><td class="mono dim">${esc(r.date)}</td>
+      <td>${esc(r.pj)}</td><td title="${esc(r.re)}">${esc(String(r.re||'').slice(0,52))}${String(r.re||'').length>52?'…':''}</td>
+      <td class="dim" title="${esc(r.attn)}">${esc(String(r.to||'').slice(0,30))}</td>
+      <td class="mono">${esc(r.bl)}</td><td>${esc(r.cargo)}</td><td>${esc(r.writer)}</td></tr>`).join('')
+    : '<tr><td colspan="8" class="dim" style="padding:20px">등록된 공문이 없습니다. 위에서 첫 번호를 발급하세요.</td></tr>';
+}
+
+async function add(){
+  if(!TOKEN){msg('먼저 토큰을 설정하세요.','err');return}
+  const n=nextRef();
+  if(n.ref==='—'){msg('발급 월을 선택하세요.','err');return}
+  const rec={ref:n.ref,date:$('#f_date').value,pj:$('#pj').value,
+    bl:$('#f_bl').value.trim(),vessel:$('#f_vessel').value.trim(),
+    cargo:$('#f_cargo').value.trim(),writer:$('#f_writer').value.trim(),note:$('#f_note').value.trim(),
+    re:$('#f_re').value.trim()||DEF.re($('#f_cargo').value.trim()),
+    to:$('#f_to').value.trim()||DEF.to, attn:$('#f_attn').value.trim()||DEF.attn};
+  if(!rec.bl&&!rec.cargo){msg('B/L 번호나 품목 중 하나는 입력하세요.','err');return}
+  $('#add').disabled=true;
+  msg(`${rec.ref} 등록 중입니다.`,'info');
+  try{
+    const body={message:`공문 ${rec.ref}${rec.writer?' · '+rec.writer:''}`,
+      content:b64enc(toCSV(ROWS.concat([rec]))),branch:CFG.branch};
+    if(SHA) body.sha=SHA;
+    const r=await fetch(API,{method:'PUT',headers:{...hdr(),'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.status===409||r.status===422){
+      msg(`다른 사람이 먼저 등록했습니다. ${rec.ref} 은(는) 발급되지 않았습니다. 새 번호를 확인하세요.`,'err');
+      await load();return;
+    }
+    if(!r.ok){const t=await r.text();
+      throw new Error(r.status===401?'토큰이 올바르지 않습니다.'
+        :r.status===403?'쓰기 권한이 없습니다. 토큰에 repo 권한을 주세요.'
+        :'등록하지 못했습니다 ('+r.status+') '+t.slice(0,120))}
+    const j=await r.json();SHA=j.content.sha;ROWS.push(rec);
+    ['#f_bl','#f_vessel','#f_cargo','#f_note','#f_re'].forEach(s=>$(s).value='');
+    render();msg(`${rec.ref} 등록했습니다.`,'ok');
+  }catch(e){msg(e.message||String(e),'err')}
+  finally{$('#add').disabled=false}
+}
+
+// 품목을 적으면 공문 제목을 자동으로 채운다 (직접 고쳐도 됨)
+$('#f_cargo').addEventListener('input',()=>{
+  const re=$('#f_re');
+  if(!re.dataset.touched) re.value=DEF.re($('#f_cargo').value.trim());
+});
+$('#f_re').addEventListener('input',()=>{ $('#f_re').dataset.touched='1'; });
+
+$('#reload').onclick=load;
+$('#add').onclick=add;
+$('#pj').onchange=render;
+$('#ym').onchange=render;
+$('#settoken').onclick=()=>{
+  const v=prompt('GitHub 개인 액세스 토큰 (repo 권한)\n이 브라우저에만 저장됩니다. 비우면 삭제됩니다.',TOKEN);
+  if(v===null) return;
+  TOKEN=v.trim();
+  try{TOKEN?localStorage.setItem('mata_token',TOKEN):localStorage.removeItem('mata_token')}catch(_){}
+  msg(TOKEN?'토큰을 저장했습니다.':'토큰을 삭제했습니다.','ok');
+  load();
+};
+(function(){
+  const t=new Date();
+  const ym=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');
+  $('#ym').value=ym;
+  $('#f_date').value=ym+'-'+String(t.getDate()).padStart(2,'0');
+  $('#f_to').value=DEF.to; $('#f_attn').value=DEF.attn;
+  load();
+})();
+</script>
+</body>
+</html>
